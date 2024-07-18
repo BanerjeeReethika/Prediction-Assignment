@@ -1,0 +1,110 @@
+---
+title: "Prediction_Assignment"
+author: "Reethika Banerjee"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+IscaretInstalled <- require("caret")
+if(!IscaretInstalled){
+    install.packages("caret")
+    library("caret")
+    }
+
+IsrandomForestInstalled <- require("randomForest")
+if(!IsrandomForestInstalled){
+    install.packages("randomForest")
+    library("randomForest")
+    }
+
+IsRpartInstalled <- require("rpart")        
+if(!IsRpartInstalled){
+    install.packages("rpart")
+    library("rpart")
+}
+install.packages("rpart.plot")
+```
+```{r}
+library(rpart.plot)
+set.seed(20000)
+#Load the data
+trainUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"   
+testUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv" 
+```
+
+```{r}
+#Delete missing values 
+training <- read.csv(url(trainUrl), na.strings=c("NA","#DIV/0!",""))  
+testing <- read.csv(url(testUrl), na.strings=c("NA","#DIV/0!",""))
+
+#Remove variables with near zero variance
+training<-training[,colSums(is.na(training)) == 0]
+testing <-testing[,colSums(is.na(testing)) == 0]
+
+#Remove columns that are not predictors, which are the the seven first columns
+training   <-training[,-c(1:7)]
+testing <-testing[,-c(1:7)]
+
+#The data after cleaning
+dim(training)
+```
+
+```{r}
+inTrain <- createDataPartition(y=training$classe, p=0.75, list=FALSE)
+mytraining <- training[inTrain, ]
+mytesting <- training[-inTrain, ]
+```
+
+```{r}
+#Decision Tree
+model <- rpart(classe ~ ., data=mytraining, method="class")
+prediction1 <- predict(model, mytesting, type = "class")
+
+rpart.plot(model)
+```
+```{r}
+prediction1 <- factor(prediction1)
+mytesting$classe <- factor(mytesting$classe)
+levels(prediction1) <- levels(mytesting$classe)
+confusionMatrix(prediction1, mytesting$classe)
+```
+From the confusion matrix, the accuracy rate is 0.5, and so the out-of-sample error rate is 0.5. Using classification tree does not predict the outcome classe very well.
+
+Prediction Model 2: Random Forest.
+```{r}
+control <- trainControl(method = "cv", number = 5)
+fit_rf <- train(classe ~ ., data = mytraining, method = "rf", 
+                   trControl = control)
+print(fit_rf, digits = 4)
+```
+```{r}
+# predict outcomes using validation set
+predict_rf <- predict(fit_rf, mytesting)
+# Show prediction result
+
+# Ensure that the caret package is loaded
+library(caret)
+
+# Convert both actual values and predictions to factors with the same levels
+actual <- factor(mytesting$classe)
+predictions <- factor(predict_rf, levels = levels(actual))
+
+# Compute the confusion matrix
+conf_rf <- confusionMatrix(predictions, actual)
+
+# Print the confusion matrix
+print(conf_rf)
+
+
+```
+```{r}
+(accuracy_rf <- conf_rf$overall[1])
+```
+```{r}
+(predict(fit_rf, mytesting))
+```
+

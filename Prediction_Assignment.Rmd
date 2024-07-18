@@ -1,0 +1,126 @@
+---
+title: "Practical Machine Learning"
+author: "Reethika Banerjee"
+date: "2024-07-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Introduction
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to predict the manner in which they did the exercise.
+
+Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+Data Loading and Processing
+Loading libraries
+```{r}
+IscaretInstalled <- require("caret")
+if(!IscaretInstalled){
+    install.packages("caret")
+    library("caret")
+    }
+
+IsrandomForestInstalled <- require("randomForest")
+if(!IsrandomForestInstalled){
+    install.packages("randomForest")
+    library("randomForest")
+    }
+
+IsRpartInstalled <- require("rpart")        
+if(!IsRpartInstalled){
+    install.packages("rpart")
+    library("rpart")
+}
+install.packages("rpart.plot")
+```
+
+
+```{r}
+library(rpart.plot)
+```
+Set Seed for reproducibility
+```{r}
+set.seed(20000)
+```
+Loading the Data
+```{r}
+#Load the data
+trainUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"   
+testUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv" 
+```
+Cleaning The Data
+```{r}
+#Delete missing values 
+training <- read.csv(url(trainUrl), na.strings=c("NA","#DIV/0!",""))  
+testing <- read.csv(url(testUrl), na.strings=c("NA","#DIV/0!",""))
+
+#Remove variables with near zero variance
+training<-training[,colSums(is.na(training)) == 0]
+testing <-testing[,colSums(is.na(testing)) == 0]
+
+#Remove columns that are not predictors, which are the the seven first columns
+training   <-training[,-c(1:7)]
+testing <-testing[,-c(1:7)]
+
+#The data after cleaning
+dim(training)
+```
+There are 19622 rows and 53 columns after the cleaning of the data.
+
+Paritioning the data
+```{r}
+inTrain <- createDataPartition(y=training$classe, p=0.75, list=FALSE)
+mytraining <- training[inTrain, ]
+mytesting <- training[-inTrain, ]
+```
+
+First Prediction Model: Using the Decision Tree
+```{r}
+
+model <- rpart(classe ~ ., data=mytraining, method="class")
+prediction1 <- predict(model, mytesting, type = "class")
+
+rpart.plot(model)
+```
+```{r}
+prediction1 <- factor(prediction1)
+mytesting$classe <- factor(mytesting$classe)
+levels(prediction1) <- levels(mytesting$classe)
+confusionMatrix(prediction1, mytesting$classe)
+```
+From the confusion matrix, the accuracy rate is 0.5, and so the out-of-sample error rate is 0.5. Using classification tree does not predict the outcome classe very well.
+
+Prediction Model 2: Random Forest.
+```{r}
+control <- trainControl(method = "cv", number = 10)
+fit_rf <- train(classe ~ ., data = mytraining, method = "rf", 
+                   trControl = control)
+print(fit_rf, digits = 4)
+```
+```{r}
+# predict outcomes using validation set
+predict_rf <- predict(fit_rf, mytesting)
+# Show prediction result
+(conf_rf <- confusionMatrix(mytesting$classe, predict_rf))
+```
+```{r}
+(accuracy_rf <- conf_rf$overall[1])
+```
+We can see from the results that for this dataset, random forest method is way better than classification tree method. The accuracy rate is 0.991, and so the out-of-sample error rate is 0.009. This may be due to the fact that many predictors are highly correlated. Random forests chooses a subset of predictors at each split and decorrelate the trees. This leads to high accuracy, although this algorithm is sometimes difficult to interpret and computationally inefficient.
+
+Prediction on Testing Set
+With the above conclusion, We now use random forests to predict the outcome variable classe for the testing set.
+
+```{r}
+(predict(fit_rf, mytesting))
+```
+
+
+
+
+
+
